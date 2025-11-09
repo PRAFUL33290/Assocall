@@ -152,15 +152,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, onUpdateUserName }) => 
                             />
                         </div>
                         <div>
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
-                            <input 
-                                type="email" 
-                                name="email" 
-                                id="email" 
-                                value={user?.email || ''}
-                                disabled
-                                className="mt-1 input-field bg-gray-100 cursor-not-allowed" 
-                            />
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email de connexion</label>
+                            <div
+                                id="email"
+                                className="mt-1 flex items-center w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-100 text-gray-600 font-medium select-all"
+                            >
+                                {user?.email || 'Non disponible'}
+                            </div>
                         </div>
                          <div className="md:col-span-2">
                             <label className="block text-sm font-medium text-gray-700">Type de compte</label>

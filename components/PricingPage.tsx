@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CheckmarkIcon, BuildingIcon } from './icons';
+import { UserRole, SubscriptionPlan, PaymentMethod } from '../types';
 
 interface PricingCardProps {
     plan: string;
@@ -35,7 +36,11 @@ const PricingCard: React.FC<PricingCardProps> = ({ plan, price, priceNote, descr
     </div>
 );
 
-const PricingPage: React.FC = () => {
+interface PricingPageProps {
+    user: { name: string; email: string; role: UserRole; subscriptionPlan: SubscriptionPlan; searchCount: number; pdfExportsUsed: number; paymentMethod: PaymentMethod | null; } | null;
+}
+
+const PricingPage: React.FC<PricingPageProps> = ({ user }) => {
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
 
     const handleNavClick = (e: React.MouseEvent<HTMLButtonElement> | React.MouseEvent<HTMLAnchorElement>) => {
@@ -45,15 +50,25 @@ const PricingPage: React.FC = () => {
         window.scrollTo(0, 0);
     };
 
-    const handleEssentialCheckout = () => {
-        // Redirigez directement vers votre lien de paiement Stripe.
-        // IMPORTANT : Le lien ci-dessous est un lien de TEST pour la démonstration.
-        // Remplacez-le par le vrai "Payment Link" que vous avez créé dans votre
-        // tableau de bord Stripe pour le Price ID : price_1SRWww7LjZC2O7sLj9Zbs3nR
-        const stripePaymentLink = 'https://buy.stripe.com/test_bIYg084j69HOfaE8ww';
-        window.location.href = stripePaymentLink;
-    };
+    const handlePlanSelection = (plan: 'essential' | 'pro') => {
+        const paymentLinks = {
+            essential: 'https://buy.stripe.com/8x26oB9HA5MZ0TudA6aR200',
+            pro: 'https://buy.stripe.com/bJe6oB4ng2AN1Xy3ZwaR201'
+        };
+        const targetUrl = paymentLinks[plan];
 
+        // Save the selected plan to use after payment success
+        sessionStorage.setItem('selectedPlan', plan);
+
+        if (user) {
+            // User is logged in, redirect directly to payment
+            window.location.href = targetUrl;
+        } else {
+            // User is not logged in, store URL and redirect to signup
+            sessionStorage.setItem('postSignupRedirect', targetUrl);
+            window.location.hash = '#/signup';
+        }
+    };
 
     const plans = {
         discovery: {
@@ -154,14 +169,17 @@ const PricingPage: React.FC = () => {
                         priceNote={getPriceNote(plans.essential, billingCycle)}
                         onClick={(e) => {
                             e.preventDefault();
-                            handleEssentialCheckout();
+                            handlePlanSelection('essential');
                         }}
                     />
                      <PricingCard 
                         {...plans.pro}
                         price={plans.pro.price[billingCycle]}
                         priceNote={getPriceNote(plans.pro, billingCycle)}
-                        onClick={handleNavClick}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            handlePlanSelection('pro');
+                        }}
                     />
                 </div>
             </section>

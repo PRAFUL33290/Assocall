@@ -25,14 +25,9 @@ export enum SubscriptionPlan {
   PRO = 'pro',
 }
 
-export interface PaymentMethod {
-  type: 'card' | 'paypal';
-  details: {
-    cardNumber?: string;
-    expiryDate?: string;
-    cvc?: string;
-    paypalEmail?: string;
-  };
+// Fix: Added PaymentMethod enum to resolve type errors.
+export enum PaymentMethod {
+    STRIPE = 'stripe',
 }
 
 export interface NavItem {

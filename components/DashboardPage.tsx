@@ -3,6 +3,7 @@ import MyProjectsView from './MyProjectsView';
 import ResearchAssistant from './ResearchAssistant';
 import ChatBot from './ChatBot';
 import DashboardSidebar from './DashboardSidebar';
+// Fix: Import PaymentMethod and add it to the user prop type.
 import { DashboardView, Project, PublicProject, UserRole, SubscriptionPlan, PaymentMethod } from '../types';
 import ProfilePage from './ProfilePage';
 import SubscriptionPage from './SubscriptionPage';
@@ -11,18 +12,19 @@ import { loadProfile, isProfileEmpty } from '../services/profileService';
 import { loadProjects, saveProjects } from '../services/projectService';
 import TenderResponsesView from './TenderResponsesView';
 import MunicipalitiesView from './MunicipalitiesView';
+import { SuccessIcon } from './icons';
 
 
 interface DashboardPageProps {
+    // Fix: Add `paymentMethod` to the user type to match the data from App.tsx.
     user: { name: string; email: string; role: UserRole; subscriptionPlan: SubscriptionPlan; searchCount: number; pdfExportsUsed: number; paymentMethod: PaymentMethod | null; } | null;
     onLogout: () => void;
     onUpdateUserName: (newName: string) => void;
     onUpdateSubscription: (newPlan: SubscriptionPlan) => void;
     onPdfExported: () => void;
-    onUpdatePaymentMethod: (method: PaymentMethod | null) => void;
 }
 
-const DashboardPage: React.FC<DashboardPageProps> = ({ user, onLogout, onUpdateUserName, onUpdateSubscription, onPdfExported, onUpdatePaymentMethod }) => {
+const DashboardPage: React.FC<DashboardPageProps> = ({ user, onLogout, onUpdateUserName, onUpdateSubscription, onPdfExported }) => {
     const getInitialView = (): DashboardView => {
         const profile = loadProfile();
         // If profile is empty, guide user to fill it first.
@@ -36,6 +38,22 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ user, onLogout, onUpdateU
     const [activeView, setActiveView] = useState<DashboardView>(getInitialView);
     const [projects, setProjects] = useState<Project[]>(loadProjects);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+    // Check for payment success message on mount
+    useEffect(() => {
+        const messageFlag = sessionStorage.getItem('paymentSuccessMessage');
+        if (messageFlag) {
+            setSuccessMessage("Vous êtes bien abonné ! Vous pouvez dès à présent profiter de notre service.");
+            sessionStorage.removeItem('paymentSuccessMessage');
+
+            const timer = setTimeout(() => {
+                setSuccessMessage(null);
+            }, 5000); // Hide after 5 seconds
+
+            return () => clearTimeout(timer);
+        }
+    }, []);
 
     useEffect(() => {
         saveProjects(projects);
@@ -93,8 +111,6 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ user, onLogout, onUpdateU
                 return <SubscriptionPage 
                     currentPlan={user?.subscriptionPlan || SubscriptionPlan.FREE}
                     onPlanChange={onUpdateSubscription}
-                    paymentMethod={user?.paymentMethod || null}
-                    onUpdatePaymentMethod={onUpdatePaymentMethod}
                 />;
             default:
                  return <MyProjectsView 
@@ -139,6 +155,13 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ user, onLogout, onUpdateU
                     </button>
                 </header>
                 
+                {successMessage && (
+                    <div className="bg-green-100 border-l-4 border-green-500 text-green-800 p-4 rounded-md mb-6 shadow-md animate-fade-in flex items-center gap-3" role="alert">
+                        <SuccessIcon />
+                        <span className="font-semibold">{successMessage}</span>
+                    </div>
+                )}
+
                 {renderActiveView()}
             </main>
             

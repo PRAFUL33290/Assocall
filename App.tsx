@@ -11,11 +11,14 @@ import LoginPage from './components/LoginPage';
 import SignUpPage from './components/SignUpPage';
 import DashboardPage from './components/DashboardPage';
 import HelpPage from './components/HelpPage'; // Ajout de l'importation
+import PaymentFailedPage from './components/PaymentFailedPage';
+// Fix: Import PaymentMethod and add it to the user state type.
 import { UserRole, SubscriptionPlan, PaymentMethod } from './types';
 
 
 const App: React.FC = () => {
-    const [route, setRoute] = useState(window.location.hash || '#/');
+    const [route, setRoute] = useState('#/payment-failed'); // Default to payment failed page for preview
+    // Fix: Add `paymentMethod` to the user state type to match what child components expect.
     const [user, setUser] = useState<{ name: string; email: string; role: UserRole; subscriptionPlan: SubscriptionPlan; searchCount: number; pdfExportsUsed: number; paymentMethod: PaymentMethod | null; } | null>(null);
 
     // Effect for hydrating user from localStorage on initial mount
@@ -34,9 +37,12 @@ const App: React.FC = () => {
                  if (parsedUser.pdfExportsUsed === undefined) {
                     parsedUser.pdfExportsUsed = 0;
                 }
-                if (parsedUser.paymentMethod === undefined) {
-                    parsedUser.paymentMethod = null;
+                // Fix: Remove old, incompatible paymentMethod property and ensure the new one exists.
+                if (parsedUser.paymentMethod) { // Migration: remove old payment method
+                    delete parsedUser.paymentMethod;
                 }
+                parsedUser.paymentMethod = null; // Always ensure it exists.
+
                 if (!parsedUser.email) {
                     parsedUser.email = 'user@example.com';
                 }
@@ -65,13 +71,50 @@ const App: React.FC = () => {
 
     useEffect(() => {
         const handleHashChange = () => {
-            setRoute(window.location.hash || '#/');
+            // Don't change the route if it's the initial preview route
+            if (window.location.hash !== '#/payment-failed' || route !== '#/payment-failed') {
+                 setRoute(window.location.hash || '#/');
+            }
         };
+        
+        // Set initial route based on hash, unless it's the preview
+        const initialHash = window.location.hash || '#/';
+        if(route !== '#/payment-failed') {
+            setRoute(initialHash);
+        }
+
         window.addEventListener('hashchange', handleHashChange);
         return () => {
             window.removeEventListener('hashchange', handleHashChange);
         };
     }, []);
+
+    const handleUpdateSubscription = (newPlan: SubscriptionPlan) => {
+        if (user) {
+            setUser({ ...user, subscriptionPlan: newPlan });
+        }
+    };
+    
+    // Effect to handle post-payment redirection and subscription update
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.hash.split('?')[1]);
+        if (params.get('payment') === 'success' && user) {
+            const selectedPlan = sessionStorage.getItem('selectedPlan');
+            if (selectedPlan) {
+                if (selectedPlan === 'essential') {
+                    handleUpdateSubscription(SubscriptionPlan.ESSENTIAL);
+                } else if (selectedPlan === 'pro') {
+                    handleUpdateSubscription(SubscriptionPlan.PRO);
+                }
+                sessionStorage.removeItem('selectedPlan');
+                // Set a flag for the dashboard to show the success message
+                sessionStorage.setItem('paymentSuccessMessage', 'true');
+                // Redirect to a clean dashboard URL
+                window.location.hash = '#/dashboard';
+            }
+        }
+    }, [route, user]); // Reruns when route changes or user logs in
+
 
     const handleLogin = (email: string, userName?: string, role?: UserRole) => {
         let finalRole = role || UserRole.ASSOCIATION;
@@ -82,6 +125,7 @@ const App: React.FC = () => {
             finalUserName = "Admin AssoCall";
         }
 
+        // Fix: Add `paymentMethod` to the new user object to match the state type.
         const newUser = { 
             name: finalUserName, 
             email: email, 
@@ -92,7 +136,14 @@ const App: React.FC = () => {
             paymentMethod: null,
         };
         setUser(newUser);
-        window.location.hash = '#/dashboard';
+        
+        const postSignupRedirect = sessionStorage.getItem('postSignupRedirect');
+        if (postSignupRedirect) {
+            sessionStorage.removeItem('postSignupRedirect');
+            window.location.href = postSignupRedirect; // Direct external navigation
+        } else {
+            window.location.hash = '#/dashboard';
+        }
     };
 
     const handleUpdateUserName = (newName: string) => {
@@ -101,12 +152,6 @@ const App: React.FC = () => {
         }
     };
 
-    const handleUpdateSubscription = (newPlan: SubscriptionPlan) => {
-        if (user) {
-            setUser({ ...user, subscriptionPlan: newPlan });
-        }
-    };
-    
     const handleSearchPerformed = () => {
         if (user && user.subscriptionPlan === SubscriptionPlan.FREE) {
             setUser(prevUser => {
@@ -126,12 +171,6 @@ const App: React.FC = () => {
         }
     };
 
-    const handleUpdatePaymentMethod = (method: PaymentMethod | null) => {
-        if (user) {
-            setUser({ ...user, paymentMethod: method });
-        }
-    };
-
     const handleLogout = () => {
         setUser(null);
         localStorage.removeItem('assoCall-foundProjects'); // Clear project cache on logout
@@ -144,7 +183,6 @@ const App: React.FC = () => {
         onUpdateUserName: handleUpdateUserName,
         onUpdateSubscription: handleUpdateSubscription,
         onPdfExported: handlePdfExported,
-        onUpdatePaymentMethod: handleUpdatePaymentMethod,
     };
 
     // --- Routing Logic ---
@@ -156,10 +194,11 @@ const App: React.FC = () => {
             case '#/': return <HomePage />;
             case '#/projets': return <ProjectsPage user={user} onSearchPerformed={handleSearchPerformed} />;
             case '#/fonctionnalites': return <FeaturesPage />;
-            case '#/tarifs': return <PricingPage />;
+            case '#/tarifs': return <PricingPage user={user} />;
             case '#/contact': return <ContactPage />;
             case '#/aide': return <HelpPage />; // Ajout de la route
             case '#/mentions': return <PlaceholderPage title="Mentions Légales" />;
+            case '#/payment-failed': return <PaymentFailedPage />;
         }
 
         // Routes that depend on authentication state
